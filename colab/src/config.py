@@ -5,7 +5,7 @@ import os
 # ---------------------------------------------------------------------------
 # CDS API (ERA5)
 # ---------------------------------------------------------------------------
-CDS_API_URL: str = os.environ.get("CDS_API_URL", "https://cds.climate.copernicus.eu/api/v2")
+CDS_API_URL: str = os.environ.get("CDS_API_URL", "https://cds.climate.copernicus.eu/api")
 CDS_API_KEY: str = os.environ.get("CDS_API_KEY", "")  # TODO: set via env
 
 # ---------------------------------------------------------------------------
