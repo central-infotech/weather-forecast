@@ -95,6 +95,18 @@ def upload_to_supabase(
             return None
         return val
 
+    def _to_int_percent(val: Any) -> int | None:
+        """Convert 0-1 float probability to 0-100 int percent."""
+        if val is None:
+            return None
+        v = float(val)
+        if math.isnan(v) or math.isinf(v):
+            return None
+        # If already in 0-100 range, just round; if 0-1, multiply by 100
+        if v <= 1.0:
+            return int(round(v * 100))
+        return int(round(v))
+
     rows = []
     for fc in forecasts:
         rows.append({
@@ -106,7 +118,7 @@ def upload_to_supabase(
             "weather": fc.get("weather"),
             "temp_max": _clean(fc.get("temp_max")),
             "temp_min": _clean(fc.get("temp_min")),
-            "precipitation_prob": _clean(fc.get("precipitation_prob")),
+            "precipitation_prob": _to_int_percent(fc.get("precipitation_prob")),
             "confidence": _clean(fc.get("confidence")),
             "model_agreement": _clean(fc.get("model_agreement")),
             "humidity": _clean(fc.get("humidity")),
