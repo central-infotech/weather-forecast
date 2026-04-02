@@ -1,0 +1,149 @@
+"""Upload module for pushing forecast results to Supabase.
+
+Creates a forecast run record and inserts individual forecast entries
+into the Supabase database.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Any
+
+from . import config
+
+logger = logging.getLogger(__name__)
+
+
+def upload_to_supabase(
+    forecasts: list[dict[str, Any]],
+    run_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Upload forecast results to Supabase.
+
+    Creates a ``forecast_runs`` record first, then batch-inserts all
+    individual forecast rows into the ``forecasts`` table with a foreign
+    key reference to the run.
+
+    Parameters
+    ----------
+    forecasts:
+        List of forecast dicts as returned by
+        ``meta_learner.run_meta_learning``.  Each dict should contain keys
+        like ``date``, ``location``, ``latitude``, ``longitude``, ``weather``,
+        ``temp_max``, ``temp_min``, ``precipitation_prob``, ``confidence``,
+        ``model_agreement``, ``humidity``, ``wind_speed``, ``pressure``.
+    run_metadata:
+        Optional dict with metadata about the pipeline run, e.g.
+        ``{"models": [...], "ensemble_size": 50, "region": "japan"}``.
+        Stored alongside the run record.
+
+    Returns
+    -------
+    dict[str, Any]
+        Summary with keys ``run_id``, ``n_inserted``, ``status``.
+
+    Raises
+    ------
+    RuntimeError
+        If Supabase credentials are not configured or insertion fails.
+    """
+    from supabase import create_client, Client  # lazy import
+
+    # --- Validate credentials ---
+    supabase_url = config.SUPABASE_URL
+    supabase_key = config.SUPABASE_KEY
+
+    if not supabase_url or not supabase_key:
+        raise RuntimeError(
+            "Supabase credentials are not configured. "
+            "Set SUPABASE_URL and SUPABASE_KEY environment variables."
+        )
+
+    logger.info("Connecting to Supabase at %s", supabase_url)
+    client: Client = create_client(supabase_url, supabase_key)
+
+    # --- Create forecast run record ---
+    now = datetime.now(timezone.utc).isoformat()
+    run_record = {
+        "created_at": now,
+        "status": "completed",
+        "n_forecasts": len(forecasts),
+        "metadata": run_metadata or {},
+    }
+
+    try:
+        run_response = (
+            client.table("forecast_runs")
+            .insert(run_record)
+            .execute()
+        )
+        run_id = run_response.data[0]["id"]
+        logger.info("Created forecast_run record: id=%s", run_id)
+    except Exception:
+        logger.exception("Failed to create forecast_run record")
+        raise RuntimeError("Failed to create forecast run record in Supabase")
+
+    # --- Insert individual forecast rows ---
+    rows = []
+    for fc in forecasts:
+        rows.append({
+            "run_id": run_id,
+            "forecast_date": fc.get("date"),
+            "location": fc.get("location"),
+            "latitude": fc.get("latitude"),
+            "longitude": fc.get("longitude"),
+            "weather": fc.get("weather"),
+            "temp_max": fc.get("temp_max"),
+            "temp_min": fc.get("temp_min"),
+            "precipitation_prob": fc.get("precipitation_prob"),
+            "confidence": fc.get("confidence"),
+            "model_agreement": fc.get("model_agreement"),
+            "humidity": fc.get("humidity"),
+            "wind_speed": fc.get("wind_speed"),
+            "pressure": fc.get("pressure"),
+            "created_at": now,
+        })
+
+    # Batch insert in chunks to avoid payload limits
+    batch_size = 500
+    n_inserted = 0
+
+    for start in range(0, len(rows), batch_size):
+        batch = rows[start : start + batch_size]
+        try:
+            response = (
+                client.table("forecasts")
+                .insert(batch)
+                .execute()
+            )
+            n_inserted += len(response.data)
+            logger.info(
+                "Inserted batch %d-%d (%d rows)",
+                start, start + len(batch), len(response.data),
+            )
+        except Exception:
+            logger.exception(
+                "Failed to insert forecast batch starting at index %d", start,
+            )
+            # Update run status to partial failure
+            try:
+                client.table("forecast_runs").update(
+                    {"status": "partial_failure"}
+                ).eq("id", run_id).execute()
+            except Exception:
+                logger.exception("Failed to update run status")
+            raise RuntimeError(
+                f"Failed to insert forecasts at batch index {start}"
+            )
+
+    logger.info(
+        "Upload complete: run_id=%s, %d/%d forecasts inserted",
+        run_id, n_inserted, len(forecasts),
+    )
+
+    return {
+        "run_id": run_id,
+        "n_inserted": n_inserted,
+        "status": "completed",
+    }
