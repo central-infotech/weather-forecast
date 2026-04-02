@@ -11,7 +11,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "AI Weather Forecast",
   description:
-    "GraphCast / FourCastNet / MetNet-3 アンサンブルによるAI天気予報",
+    "GraphCast / FourCastNet / MetNet-3 によるサブシーズナルAI天気予報",
 };
 
 export default function RootLayout({
