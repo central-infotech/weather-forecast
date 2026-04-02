@@ -87,23 +87,31 @@ def upload_to_supabase(
         raise RuntimeError("Failed to create forecast run record in Supabase")
 
     # --- Insert individual forecast rows ---
+    import math
+
+    def _clean(val: Any) -> Any:
+        """Replace NaN/Inf with None for JSON serialization."""
+        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+            return None
+        return val
+
     rows = []
     for fc in forecasts:
         rows.append({
             "run_id": run_id,
             "target_date": fc.get("date"),
             "location": fc.get("location"),
-            "latitude": fc.get("latitude"),
-            "longitude": fc.get("longitude"),
+            "latitude": _clean(fc.get("latitude")),
+            "longitude": _clean(fc.get("longitude")),
             "weather": fc.get("weather"),
-            "temp_max": fc.get("temp_max"),
-            "temp_min": fc.get("temp_min"),
-            "precipitation_prob": fc.get("precipitation_prob"),
-            "confidence": fc.get("confidence"),
-            "model_agreement": fc.get("model_agreement"),
-            "humidity": fc.get("humidity"),
-            "wind_speed": fc.get("wind_speed"),
-            "pressure": fc.get("pressure"),
+            "temp_max": _clean(fc.get("temp_max")),
+            "temp_min": _clean(fc.get("temp_min")),
+            "precipitation_prob": _clean(fc.get("precipitation_prob")),
+            "confidence": _clean(fc.get("confidence")),
+            "model_agreement": _clean(fc.get("model_agreement")),
+            "humidity": _clean(fc.get("humidity")),
+            "wind_speed": _clean(fc.get("wind_speed")),
+            "pressure": _clean(fc.get("pressure")),
             "created_at": now,
         })
 
