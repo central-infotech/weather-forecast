@@ -230,7 +230,7 @@ def preprocess(dataset: xr.Dataset, region: dict[str, float] | None = None) -> x
 # ---------------------------------------------------------------------------
 
 def fetch_all_data(
-    target_date: datetime,
+    target_date: datetime | str,
     region: str = "japan",
 ) -> dict[str, xr.Dataset]:
     """Fetch and preprocess data from all sources.
@@ -247,6 +247,9 @@ def fetch_all_data(
     dict[str, xr.Dataset]
         Keys ``era5``, ``gfs``, ``ecmwf`` mapping to preprocessed Datasets.
     """
+    if isinstance(target_date, str):
+        target_date = datetime.fromisoformat(target_date)
+
     region_bounds = config.JAPAN_REGION  # extend with other regions as needed
 
     results: dict[str, xr.Dataset] = {}

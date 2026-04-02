@@ -65,11 +65,13 @@ def upload_to_supabase(
 
     # --- Create forecast run record ---
     now = datetime.now(timezone.utc).isoformat()
+    meta = run_metadata or {}
     run_record = {
-        "created_at": now,
+        "executed_at": now,
+        "initial_data_source": meta.get("initial_data_source", "GFS"),
+        "ensemble_size": meta.get("ensemble_size", config.ENSEMBLE_SIZE),
+        "models_used": meta.get("models", config.MODEL_NAMES),
         "status": "completed",
-        "n_forecasts": len(forecasts),
-        "metadata": run_metadata or {},
     }
 
     try:
@@ -89,7 +91,7 @@ def upload_to_supabase(
     for fc in forecasts:
         rows.append({
             "run_id": run_id,
-            "forecast_date": fc.get("date"),
+            "target_date": fc.get("date"),
             "location": fc.get("location"),
             "latitude": fc.get("latitude"),
             "longitude": fc.get("longitude"),
@@ -144,6 +146,6 @@ def upload_to_supabase(
 
     return {
         "run_id": run_id,
-        "n_inserted": n_inserted,
+        "count": n_inserted,
         "status": "completed",
     }

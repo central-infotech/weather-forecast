@@ -491,7 +491,7 @@ def run_meta_learning(
                 weather = determine_weather(temp_max, temp_min, precip_prob, humidity)
 
                 forecasts.append({
-                    "date": forecast_date.strftime("%Y-%m-%d %H:%M"),
+                    "date": forecast_date.strftime("%Y-%m-%d"),
                     "location": f"Grid({float(lat):.2f}, {float(lon):.2f})",
                     "latitude": float(lat),
                     "longitude": float(lon),
